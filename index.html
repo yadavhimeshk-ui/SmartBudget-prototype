@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartBudget | Cloud Sync Zen Finance</title>
+    
+    <!-- Firebase SDKs (Compat Version for Script Tags) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+    <!-- React & Build Tools -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        navy: '#0F172A',
+                        sage: '#10B981',
+                        softOrange: '#F97316',
+                        offwhite: '#F8FAFC',
+                        charcoal: '#1E293B',
+                        cardBorder: 'rgba(15, 23, 42, 0.08)'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #F8FAFC; color: #1E293B; scroll-behavior: smooth; }
+        .glass-header { background: rgba(15, 23, 42, 0.98); backdrop-filter: blur(10px); }
+        .soft-shadow { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); }
+        .fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .modal-overlay { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(4px); }
+        .chart-bar { transition: width 1s cubic-bezier(0.4, 0, 0.2, 1); }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // --- 1. FIREBASE CONFIGURATION (INTEGRATED FROM INDEX.HTML) ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyBUf1gI2yndt2dbsnD7ifE-4QDaA9O49_I",
+            authDomain: "smartbudget-d7e52.firebaseapp.com",
+            projectId: "smartbudget-d7e52",
+            storageBucket: "smartbudget-d7e52.firebasestorage.app",
+            messagingSenderId: "945663000251",
+            appId: "1:945663000251:web:66b68a6c13a1bc1ec1f39e",
+            measurementId: "G-87DMBF65NL"
+        };
+
+        // Initialize Firebase
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const db = firebase.firestore();
+
+        // --- SUB-COMPONENTS (PRESERVED FROM AI_STUDIO_CODE 5) ---
+
+        const LandingView = ({ setView }) => (
+            <div className="fade-in">
+                <nav className="glass-header text-white px-8 py-4 flex justify-between items-center fixed w-full top-0 z-50">
+                    <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-sage rounded-lg flex items-center justify-center font-bold">S</div>
+                        <span className="font-bold text-xl tracking-tight">SmartBudget</span>
+                    </div>
+                    <div className="flex gap-4">
+                        <button onClick={() => setView('auth')} className="bg-white/10 hover:bg-white/20 px-5 py-2 rounded-full text-sm font-medium transition">Sign In</button>
+                        <button onClick={() => setView('auth')} className="bg-sage hover:opacity-90 px-5 py-2 rounded-full text-sm font-bold transition">Get Started</button>
+                    </div>
+                </nav>
+                <section className="pt-32 pb-20 px-8 max-w-6xl mx-auto text-center">
+                    <span className="bg-sage/10 text-sage px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest">Privacy-First Finance</span>
+                    <h1 className="text-6xl font-extrabold text-navy mt-6 leading-tight">Take the Stress Out of <br/><span className="text-sage">Daily Spending.</span></h1>
+                    <p className="text-slate-500 text-xl mt-6 max-w-2xl mx-auto leading-relaxed">Specifically designed for students and young professionals. No bank permissions required.</p>
+                    <div className="mt-10 flex justify-center gap-4">
+                        <button onClick={() => setView('auth')} className="bg-navy text-white px-8 py-4 rounded-2xl font-bold text-lg shadow-xl hover:-translate-y-1 transition-all">Get Started Free</button>
+                    </div>
+                    <div className="mt-20 grid md:grid-cols-3 gap-8 text-left">
+                        {[{ title: "Manual Privacy", desc: "No SMS scraping. You control your data.", icon: "🔒" },
+                          { title: "Daily Pacing", desc: "Calculate your disposable limit instantly.", icon: "📊" },
+                          { title: "AI Coaching", desc: "Receive non-judgmental financial advice.", icon: "🤖" }
+                        ].map((f, i) => (
+                            <div key={i} className="bg-white p-8 rounded-[32px] border border-cardBorder soft-shadow">
+                                <div className="text-3xl mb-4">{f.icon}</div>
+                                <h3 className="font-bold text-xl mb-2">{f.title}</h3>
+                                <p className="text-slate-500 leading-relaxed">{f.desc}</p>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+            </div>
+        );
+
+        const AuthView = ({ user, handleUserUpdate, onAuthAction, authMode, setAuthMode, isLoading }) => (
+            <div className="min-h-screen flex items-center justify-center bg-offwhite p-6 fade-in">
+                <div className="bg-white w-full max-w-md p-10 rounded-[40px] border border-cardBorder soft-shadow">
+                    <h2 className="text-3xl font-bold text-navy mb-2 text-center">{authMode === 'signup' ? 'Create Profile' : 'Welcome Back'}</h2>
+                    <p className="text-slate-500 text-center mb-8">{authMode === 'signup' ? 'Start your journey to financial peace.' : 'Sign in to access your dashboard.'}</p>
+                    <div className="space-y-5">
+                        {authMode === 'signup' && (
+                            <div>
+                                <label className="text-xs font-bold text-slate-400 uppercase block mb-2">Full Name</label>
+                                <input type="text" value={user.name} onChange={e => handleUserUpdate('name', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 outline-none focus:border-sage transition" placeholder="John Doe" />
+                            </div>
+                        )}
+                        <div>
+                            <label className="text-xs font-bold text-slate-400 uppercase block mb-2">Email Address</label>
+                            <input type="email" value={user.email} onChange={e => handleUserUpdate('email', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 outline-none focus:border-sage transition" placeholder="john@example.com" />
+                        </div>
+                        {authMode === 'signup' && (
+                            <div>
+                                <label className="text-xs font-bold text-slate-400 uppercase block mb-2">Profession</label>
+                                <select value={user.profession} onChange={e => handleUserUpdate('profession', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 outline-none focus:border-sage transition">
+                                    <option>Student</option>
+                                    <option>Freelancer</option>
+                                    <option>Working Professional</option>
+                                    <option>Entrepreneur</option>
+                                </select>
+                            </div>
+                        )}
+                        <button 
+                            disabled={isLoading}
+                            onClick={onAuthAction} 
+                            className="w-full bg-navy text-white py-5 rounded-2xl font-bold text-lg hover:bg-slate-800 transition-all mt-4 flex justify-center items-center"
+                        >
+                            {isLoading ? "Syncing..." : (authMode === 'signup' ? 'Set Your Financial Details' : 'Sign In to Dashboard')}
+                        </button>
+                        <p className="text-center text-sm text-slate-400">
+                            {authMode === 'signup' ? 'Already have an account?' : 'New here?'} 
+                            <button onClick={() => setAuthMode(authMode === 'signup' ? 'login' : 'signup')} className="text-sage font-bold ml-1 hover:underline">
+                                {authMode === 'signup' ? 'Login' : 'Create Account'}
+                            </button>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        );
+
+        const SetupView = ({ income, setIncome, fixedExpenses, addFixedExpenseField, updateFixedExpense, removeFixedExpense, goal, setGoal, netDisposable, onSaveSetup, totalFixedCost }) => (
+            <div className="min-h-screen bg-offwhite p-6 md:p-12 fade-in">
+                <div className="max-w-3xl mx-auto bg-white p-10 rounded-[40px] border border-cardBorder soft-shadow">
+                    <div className="flex justify-between items-center mb-8 border-b pb-6">
+                        <h2 className="text-3xl font-extrabold text-navy">Financial Setup</h2>
+                        <div className="text-right">
+                            <p className="text-xs font-bold text-slate-400 uppercase">Disposable Estimate</p>
+                            <p className="text-2xl font-bold text-sage">₹{netDisposable}/mo</p>
+                        </div>
+                    </div>
+                    <div className="space-y-10">
+                        <div>
+                            <label className="text-sm font-bold text-navy mb-3 block">1. Monthly Expected Earnings (₹)</label>
+                            <input type="number" value={income} onChange={e => setIncome(e.target.value)} className="w-full text-3xl font-bold text-sage bg-slate-50 border-b-2 border-slate-100 p-4 focus:border-sage outline-none transition" placeholder="0" />
+                        </div>
+                        <div>
+                            <div className="flex justify-between items-center mb-4">
+                                <label className="text-sm font-bold text-navy">2. Monthly Fixed Expenses</label>
+                                <button onClick={addFixedExpenseField} className="text-xs bg-navy text-white px-3 py-1.5 rounded-lg font-bold hover:bg-slate-700 transition">+ Add More Expense</button>
+                            </div>
+                            <div className="space-y-3">
+                                {fixedExpenses.map((exp) => (
+                                    <div key={exp.id} className="flex gap-4 items-center">
+                                        <input type="text" value={exp.name} placeholder="Expense Name" onChange={(e) => updateFixedExpense(exp.id, 'name', e.target.value)} className="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:border-sage" />
+                                        <input type="number" value={exp.amount} placeholder="Amount" onChange={(e) => updateFixedExpense(exp.id, 'amount', e.target.value)} className="w-32 bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:border-sage font-bold" />
+                                        <button onClick={() => removeFixedExpense(exp.id)} className="p-2 text-softOrange hover:bg-softOrange/10 rounded-full transition">✕</button>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="mt-4 p-4 bg-navy text-white rounded-2xl flex justify-between items-center">
+                                <span className="text-sm font-medium opacity-70">Total Fixed Costs:</span>
+                                <span className="text-xl font-bold">₹{totalFixedCost}</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label className="text-sm font-bold text-navy mb-3 block">3. Savings & Financial Goal</label>
+                            <div className="grid grid-cols-2 gap-4">
+                                <input type="text" value={goal.name} placeholder="Goal Name" onChange={e => setGoal({...goal, name: e.target.value})} className="bg-slate-50 border border-slate-200 rounded-xl p-4 outline-none focus:border-sage" />
+                                <input type="number" value={goal.target} placeholder="Target ₹" onChange={e => setGoal({...goal, target: e.target.value})} className="bg-slate-50 border border-slate-200 rounded-xl p-4 outline-none focus:border-sage font-bold" />
+                            </div>
+                        </div>
+                        <button onClick={onSaveSetup} className="w-full bg-sage text-white py-5 rounded-[20px] font-bold text-xl hover:opacity-90 shadow-lg transition-all active:scale-[0.98]">Save & Go to Dashboard</button>
+                    </div>
+                </div>
+            </div>
+        );
+
+        const DashboardView = ({ 
+            user, income, totalFixedCost, goal, netDisposable, dailyBudgetLimit, 
+            analyticsTab, setAnalyticsTab, todayTotalSpent, dailyExpenses, 
+            daysSinceJoined, setJoinDate, setView, 
+            newTx, setNewTx, addDailyTransaction, handleLogout 
+        }) => {
+            
+            // --- AI ADVICE ENGINE LOGIC ---
+            const aiAdvice = useMemo(() => {
+                const limit = Number(dailyBudgetLimit);
+                if (user.profession === "Student") {
+                    return {
+                        title: "Student Savings Hack",
+                        text: "Try sticking to home-cooked meals 4 days a week. You'll save enough by next month to fund your " + (goal.name || "next tech gadget") + "!",
+                        tip: "Use student discounts for all transport and study materials."
+                    };
+                } else if (user.profession === "Freelancer") {
+                    return {
+                        title: "Freelance Stability Tip",
+                        text: "Since your income varies, aim to save 20% of today's surplus into an emergency fund.",
+                        tip: "Set aside tax monthly so it doesn't hit you all at once."
+                    };
+                } else {
+                    return {
+                        title: "Professional Growth",
+                        text: "With a disposable income of ₹" + netDisposable + ", consider automating a small SIP. Your future self will thank you.",
+                        tip: "Evaluate recurring subscriptions every 30 days."
+                    };
+                }
+            }, [user.profession, dailyBudgetLimit, goal.name, netDisposable]);
+
+            // --- VISUAL CHART LOGIC ---
+            const categoryData = useMemo(() => {
+                const summary = {};
+                dailyExpenses.forEach(tx => {
+                    summary[tx.category] = (summary[tx.category] || 0) + Number(tx.amount);
+                });
+                return summary;
+            }, [dailyExpenses]);
+
+            return (
+                <div className="min-h-screen bg-offwhite pb-20 fade-in">
+                    <nav className="glass-header text-white px-8 py-6 flex justify-between items-center sticky top-0 z-50">
+                        <div>
+                            <h2 className="text-xl font-bold">Welcome, {user.name || 'User'}</h2>
+                            <p className="text-xs text-white/50 font-medium tracking-wide uppercase">{user.profession}</p>
+                        </div>
+                        <div className="flex gap-3">
+                            <button onClick={() => setView('setup')} className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-xl text-xs font-bold transition">⚙️ Details</button>
+                            <button onClick={handleLogout} className="bg-softOrange/20 text-softOrange hover:bg-softOrange hover:text-white px-4 py-2 rounded-xl text-xs font-bold transition">Logout</button>
+                        </div>
+                    </nav>
+                    
+                    <main className="max-w-6xl mx-auto p-6 space-y-8">
+                        {/* Financial Overview Cards */}
+                        <div className="grid md:grid-cols-4 gap-6">
+                            {[
+                                { label: "Total Income", val: `₹${income || 0}`, color: "text-navy" },
+                                { label: "Fixed Costs", val: `₹${totalFixedCost}`, color: "text-softOrange" },
+                                { label: "Disposable / Mo", val: `₹${netDisposable}`, color: "text-navy" },
+                                { label: "Daily Limit", val: `₹${dailyBudgetLimit}`, color: "text-sage" }
+                            ].map((card, i) => (
+                                <div key={i} className="bg-white p-6 rounded-[24px] border border-cardBorder soft-shadow">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{card.label}</p>
+                                    <p className={`text-2xl font-black ${card.color}`}>{card.val}</p>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="grid lg:grid-cols-3 gap-8">
+                            <div className="lg:col-span-2 space-y-8">
+                                {/* Quick Add Expense Card */}
+                                <div className="bg-white p-8 rounded-[32px] border border-cardBorder soft-shadow">
+                                    <h3 className="text-navy font-bold mb-6 flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-sage"></span> Quick Expense Input
+                                    </h3>
+                                    <form onSubmit={addDailyTransaction} className="flex flex-col md:flex-row gap-4">
+                                        <input required type="text" value={newTx.title} onChange={e => setNewTx({...newTx, title: e.target.value})} className="flex-[2] bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none" placeholder="Expense Title" />
+                                        <input required type="number" value={newTx.amount} onChange={e => setNewTx({...newTx, amount: e.target.value})} className="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none font-bold" placeholder="Amount ₹" />
+                                        <select value={newTx.category} onChange={e => setNewTx({...newTx, category: e.target.value})} className="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none appearance-none">
+                                            <option>🍔 Food</option><option>🚗 Travel</option><option>📚 Study</option><option>🛍️ Shopping</option><option>💡 Utility</option>
+                                        </select>
+                                        <button type="submit" className="bg-sage text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-sage/20 transition hover:scale-105">Add</button>
+                                    </form>
+                                </div>
+
+                                {/* Analytics Section with Visual Bars */}
+                                <div className="bg-white rounded-[32px] border border-cardBorder soft-shadow overflow-hidden">
+                                    <div className="flex border-b">
+                                        {['daily', 'weekly', 'monthly'].map(t => (
+                                            <button key={t} onClick={() => setAnalyticsTab(t)} className={`flex-1 py-5 text-sm font-bold uppercase tracking-wider transition-all ${analyticsTab === t ? 'text-sage border-b-4 border-sage bg-sage/5' : 'text-slate-400 hover:text-navy'}`}>{t} View</button>
+                                        ))}
+                                    </div>
+                                    <div className="p-8">
+                                        {analyticsTab === 'daily' && (
+                                            <div className="fade-in space-y-8">
+                                                <div className="flex justify-between items-center bg-sage/5 p-6 rounded-2xl border border-sage/10">
+                                                    <div>
+                                                        <h3 className="text-slate-500 text-xs font-bold uppercase mb-1">Budget Burn</h3>
+                                                        <p className="text-2xl font-black text-navy">Spent ₹{todayTotalSpent} <span className="text-slate-300 font-normal">/ ₹{dailyBudgetLimit}</span></p>
+                                                    </div>
+                                                    <div className="w-24 h-2 bg-slate-200 rounded-full overflow-hidden">
+                                                        <div className="h-full bg-sage transition-all duration-700" style={{width: `${Math.min((todayTotalSpent/dailyBudgetLimit)*100, 100)}%`}}></div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Category Distribution Visualizer */}
+                                                <div>
+                                                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Daily Breakdown</h4>
+                                                    <div className="space-y-3">
+                                                        {Object.keys(categoryData).length === 0 ? <p className="text-sm text-slate-300 italic">No category data yet.</p> : 
+                                                            Object.entries(categoryData).map(([cat, val]) => (
+                                                                <div key={cat} className="space-y-1">
+                                                                    <div className="flex justify-between text-xs font-bold px-1"><span>{cat}</span><span>₹{val}</span></div>
+                                                                    <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                                        <div className="chart-bar h-full bg-navy rounded-full" style={{width: `${(val/todayTotalSpent)*100}%`}}></div>
+                                                                    </div>
+                                                                </div>
+                                                            ))
+                                                        }
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-3">
+                                                    {dailyExpenses.map(tx => (
+                                                        <div key={tx.id} className="flex justify-between items-center p-4 bg-offwhite rounded-[20px] border border-cardBorder">
+                                                            <div className="flex items-center gap-3">
+                                                                <span className="text-xl">{tx.category.split(' ')[0]}</span>
+                                                                <div><p className="font-bold text-navy text-sm">{tx.title}</p><p className="text-[10px] text-slate-400 uppercase font-bold tracking-tight">{tx.category.split(' ')[1]}</p></div>
+                                                            </div>
+                                                            <p className="font-black text-navy">₹{tx.amount}</p>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {/* Weekly/Monthly Lock Logic */}
+                                        {(analyticsTab === 'weekly' || analyticsTab === 'monthly') && (
+                                            <div className="flex items-center justify-center h-48 text-center fade-in">
+                                                { (analyticsTab === 'weekly' && daysSinceJoined >= 7) || (analyticsTab === 'monthly' && daysSinceJoined >= 30) ? 
+                                                    <div className="text-sage font-bold">Trend Graphs Unlocked: High Spending detected on Weekend.</div> :
+                                                    <div className="space-y-3"><div className="text-4xl">🔒</div><h3 className="text-lg font-bold text-navy">{analyticsTab === 'weekly' ? 'Weekly' : 'Monthly'} Data Locked</h3><p className="text-slate-500 text-xs">Unlock in {analyticsTab === 'weekly' ? 7 - daysSinceJoined : 30 - daysSinceJoined} days.</p></div>
+                                                }
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-8">
+                                {/* AI Financial Coach Card */}
+                                <div className="bg-navy text-white p-8 rounded-[32px] soft-shadow relative overflow-hidden group">
+                                    <div className="absolute top-0 right-0 p-4 opacity-10 text-6xl group-hover:scale-110 transition-transform">🤖</div>
+                                    <h3 className="text-sage font-bold uppercase tracking-widest text-xs mb-4">AI Financial Coach</h3>
+                                    <h4 className="text-xl font-bold mb-2">{aiAdvice.title}</h4>
+                                    <p className="text-sm text-slate-300 leading-relaxed mb-6">{aiAdvice.text}</p>
+                                    <div className="bg-white/10 p-4 rounded-2xl border border-white/5">
+                                        <p className="text-[10px] font-bold text-sage uppercase mb-1">Coach's Pro Tip</p>
+                                        <p className="text-xs italic text-white/80">"{aiAdvice.tip}"</p>
+                                    </div>
+                                </div>
+
+                                {/* Goal Progress Tracking */}
+                                <div className="bg-white p-8 rounded-[32px] border border-cardBorder soft-shadow">
+                                    <h3 className="text-navy font-bold text-sm mb-6 flex justify-between">
+                                        Goal Tracker 🎯
+                                        <span className="text-xs text-slate-300 font-normal">Annual View</span>
+                                    </h3>
+                                    <p className="text-xs font-bold text-slate-400 uppercase mb-2">{goal.name || 'Financial Goal'}</p>
+                                    <div className="flex justify-between items-end mb-2">
+                                        <span className="text-2xl font-black text-navy">₹{Math.floor(Number(netDisposable)*0.15)} <span className="text-xs font-normal text-slate-400">saved</span></span>
+                                        <span className="text-xs font-bold text-slate-400">Target: ₹{goal.target || 0}</span>
+                                    </div>
+                                    <div className="w-full h-2 bg-slate-100 rounded-full">
+                                        <div className="h-full bg-sage rounded-full" style={{width: '15%'}}></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Admin Simulation Controls */}
+                        <div className="p-4 bg-slate-100 rounded-2xl flex justify-between items-center opacity-40 hover:opacity-100 transition">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Admin Simulation</span>
+                            <div className="flex gap-2">
+                                <button onClick={() => setJoinDate(new Date(Date.now() - 8 * 24 * 60 * 60 * 1000))} className="bg-white text-[9px] px-3 py-1 rounded border font-bold">Simulate Day 8</button>
+                                <button onClick={() => setJoinDate(new Date(Date.now() - 31 * 24 * 60 * 60 * 1000))} className="bg-white text-[9px] px-3 py-1 rounded border font-bold">Simulate Day 31</button>
+                            </div>
+                        </div>
+                    </main>
+                </div>
+            );
+        };
+
+        /** 
+         * MAIN APP COMPONENT (THE STATE & FIREBASE SYNC ENGINE)
+         */
+        const SmartBudgetApp = () => {
+            const [view, setView] = useState('landing'); 
+            const [authMode, setAuthMode] = useState('signup'); // signup, login
+            const [isLoading, setIsLoading] = useState(false);
+
+            // User Info
+            const [user, setUser] = useState({ name: '', email: '', profession: 'Student' });
+            
+            // Financial State
+            const [income, setIncome] = useState("");
+            const [fixedExpenses, setFixedExpenses] = useState([{ id: Date.now(), name: '', amount: "" }]);
+            const [goal, setGoal] = useState({ name: '', target: "" });
+            const [dailyExpenses, setDailyExpenses] = useState([]);
+            
+            // UI State
+            const [analyticsTab, setAnalyticsTab] = useState('daily');
+            const [joinDate, setJoinDate] = useState(new Date()); 
+            const [newTx, setNewTx] = useState({ title: '', amount: '', category: '🍔 Food' });
+
+            const handleUserUpdate = (field, value) => setUser(prev => ({ ...prev, [field]: value }));
+
+            // Helper to sanitize email for Firestore Document ID
+            const getDocId = (email) => {
+                return email ? email.toLowerCase().trim().replace(/[^a-z0-9]/g, "_") : "";
+            };
+
+            // Push full user state to Firebase Firestore Cloud
+            const syncDataToCloud = async (overrideData = null) => {
+                const docId = getDocId(user.email);
+                if (!docId) return;
+
+                const payload = overrideData || {
+                    user,
+                    income,
+                    fixedExpenses,
+                    goal,
+                    dailyExpenses,
+                    joinDate: joinDate.toISOString(),
+                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                };
+
+                try {
+                    await db.collection('users').doc(docId).set(payload, { merge: true });
+                    console.log("Cloud Sync Successful");
+                } catch (e) {
+                    console.error("Cloud Sync Error: ", e);
+                }
+            };
+
+            // Sign Up and Login Handler with Cloud Fetching
+            const handleAuthAction = async () => {
+                if (!user.email) { alert("Email required"); return; }
+                const docId = getDocId(user.email);
+                setIsLoading(true);
+
+                try {
+                    const doc = await db.collection('users').doc(docId).get();
+                    
+                    if (authMode === 'login') {
+                        if (doc.exists) {
+                            const data = doc.data();
+                            setUser(data.user || user);
+                            setIncome(data.income || "");
+                            setFixedExpenses(data.fixedExpenses || [{ id: Date.now(), name: '', amount: "" }]);
+                            setGoal(data.goal || { name: '', target: "" });
+                            setDailyExpenses(data.dailyExpenses || []);
+                            if (data.joinDate) setJoinDate(new Date(data.joinDate));
+                            setView('dashboard');
+                        } else {
+                            alert("Profile not found in cloud. Please Create Account.");
+                            setAuthMode('signup');
+                        }
+                    } else {
+                        // Sign Up
+                        await db.collection('users').doc(docId).set({
+                            user,
+                            income: "",
+                            fixedExpenses: [{ id: Date.now(), name: '', amount: "" }],
+                            goal: { name: '', target: "" },
+                            dailyExpenses: [],
+                            joinDate: new Date().toISOString()
+                        }, { merge: true });
+                        setView('setup');
+                    }
+                } catch (e) {
+                    console.error(e);
+                    alert("Auth error. Please verify Firestore is created in Test Mode.");
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            const onSaveSetup = () => {
+                syncDataToCloud();
+                setView('dashboard');
+            };
+
+            const addDailyTransaction = (e) => {
+                e.preventDefault();
+                if (!newTx.title || !newTx.amount) return;
+                const updatedList = [{ ...newTx, id: Date.now(), date: new Date().toISOString() }, ...dailyExpenses];
+                setDailyExpenses(updatedList);
+                setNewTx({ title: '', amount: '', category: '🍔 Food' });
+                
+                // Immediate Cloud Sync for new transactions
+                const docId = getDocId(user.email);
+                if (docId) {
+                    db.collection('users').doc(docId).update({ dailyExpenses: updatedList });
+                }
+            };
+
+            const handleLogout = () => {
+                setView('landing');
+                setUser({ name: '', email: '', profession: 'Student' });
+                setIncome("");
+                setFixedExpenses([{ id: Date.now(), name: '', amount: "" }]);
+                setGoal({ name: '', target: "" });
+                setDailyExpenses([]);
+            };
+
+            // --- CALCULATIONS ---
+            const totalFixedCost = useMemo(() => 
+                fixedExpenses.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0)
+            , [fixedExpenses]);
+
+            const netDisposable = useMemo(() => {
+                const inc = Number(income) || 0;
+                const savings = (Number(goal.target) || 0) / 12;
+                return (inc - totalFixedCost - savings).toFixed(0);
+            }, [income, totalFixedCost, goal]);
+
+            const dailyBudgetLimit = useMemo(() => (Number(netDisposable) / 30).toFixed(0), [netDisposable]);
+
+            const todayTotalSpent = useMemo(() => {
+                const today = new Date().toDateString();
+                return dailyExpenses
+                    .filter(ex => new Date(ex.date).toDateString() === today)
+                    .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+            }, [dailyExpenses]);
+
+            const daysSinceJoined = Math.floor((new Date() - joinDate) / (1000 * 60 * 60 * 24));
+
+            return (
+                <div className="min-h-screen">
+                    {view === 'landing' && <LandingView setView={setView} />}
+                    {view === 'auth' && (
+                        <AuthView 
+                            user={user} 
+                            handleUserUpdate={(f, v) => setUser(prev => ({...prev, [f]: v}))} 
+                            onAuthAction={handleAuthAction} 
+                            authMode={authMode} 
+                            setAuthMode={setAuthMode} 
+                            isLoading={isLoading} 
+                        />
+                    )}
+                    {view === 'setup' && (
+                        <SetupView 
+                            income={income} setIncome={setIncome} 
+                            fixedExpenses={fixedExpenses} 
+                            addFixedExpenseField={() => setFixedExpenses([...fixedExpenses, { id: Date.now(), name: '', amount: "" }])} 
+                            updateFixedExpense={(id, f, v) => setFixedExpenses(fixedExpenses.map(ex => ex.id === id ? {...ex, [f]: v} : ex))} 
+                            removeFixedExpense={(id) => fixedExpenses.length > 1 && setFixedExpenses(fixedExpenses.filter(ex => ex.id !== id))} 
+                            goal={goal} setGoal={setGoal} 
+                            netDisposable={netDisposable} totalFixedCost={totalFixedCost} 
+                            onSaveSetup={onSaveSetup} 
+                            setView={setView} 
+                        />
+                    )}
+                    {view === 'dashboard' && (
+                        <DashboardView 
+                            user={user} income={income} totalFixedCost={totalFixedCost} 
+                            goal={goal} netDisposable={netDisposable} dailyBudgetLimit={dailyBudgetLimit} 
+                            analyticsTab={analyticsTab} setAnalyticsTab={setAnalyticsTab} 
+                            todayTotalSpent={todayTotalSpent} dailyExpenses={dailyExpenses} 
+                            daysSinceJoined={daysSinceJoined} setJoinDate={setJoinDate} setDailyExpenses={setDailyExpenses} 
+                            setView={setView} newTx={newTx} setNewTx={setNewTx} 
+                            addDailyTransaction={addDailyTransaction} handleLogout={handleLogout} 
+                        />
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<SmartBudgetApp />);
+    </script>
+</body>
+</html>
